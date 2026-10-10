@@ -2,7 +2,7 @@
 
 Virtualized SOC environment on a single host with VirtualBox. Kali attacks a Windows AD domain (`ADLAB`), Splunk collects Windows Event Logs and Sysmon so I can see how each attack looks and figure out detection.
 
-**Status:** 🚧 In progress. Splunk, log forwarding, AD, and two attack scenarios done (RDP brute force, Atomic Red Team local account creation). Adding more.
+**Status:** 🚧 In progress. Splunk, log forwarding, AD, and one attack scenario done (RDP brute force). Adding more.
 
 ## Ethics & Scope
 
@@ -41,3 +41,7 @@ More in progress.
 
 - Screenshots have creds scrubbed, lab passwords only.
 - Kali and Windows VMs aren't NTP synced, timestamps can be off by host. Events get matched by source IP + order instead (noted per scenario).
+
+## References
+
+Built following along with [Video Title](https://youtube.com/watch?v=...) by [Creator Name], adapted for this lab's domain setup, deviations documented per scenario.
