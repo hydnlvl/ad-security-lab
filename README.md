@@ -6,15 +6,13 @@ Virtualized SOC environment on a single host with VirtualBox. Kali attacks a Win
 
 ## Ethics & Scope
 
-Isolated lab. All VMs on a private VirtualBox NAT network, no bridge to anything real. Credentials are weak and lab-only, no real accounts or data involved. Point is learning detection, not writing an attack guide.
+This is an isolated lab. All VMs on a private VirtualBox NAT network, no bridge to anything real. Credentials are weak and lab-only, no real accounts or data involved. The point is learning detection, not writing an attack guide.
 
 ## Skills Demonstrated
 
 SIEM deployment and SPL searching · endpoint telemetry (Sysmon, Windows Event Logs) · AD administration · attack simulation (Kali, Hydra, Atomic Red Team) · MITRE ATT&CK mapping · detection engineering · virtual networking · troubleshooting
 
 ## Lab Architecture
-
-![Network Diagram](diagrams/network-diagram.png)
 
 All VMs on `192.168.10.0/24`, isolated from the host network.
 
@@ -27,12 +25,15 @@ All VMs on `192.168.10.0/24`, isolated from the host network.
 
 Logs forward to Splunk via Universal Forwarder (port 9997) into the `endpoint` index.
 
+![Network Diagram](diagrams/network-diagram.png)
+![Network Diagram](screenshots/setup/virtualbox-vms.png)
+
 ## Attack Scenarios
 
 | # | Scenario | MITRE | Status |
 |---|---|---|---|
 | 01 | [RDP Brute Force](attacks/01-rdp-brute-force.md) | T1110.001 | ✅ |
-| 02 | [Atomic Red Team: Create Local Account](attacks/02-atomic-red-team-t1136.md) | T1136.001 | ✅ |
+| 02 | [Atomic Red Team: Create Local Account](attacks/02-atomic-red-team-t1136.md) | T1136.001 | 🚧 |
 
 More in progress.
 
