@@ -28,6 +28,12 @@ Logs forward to Splunk via Universal Forwarder (port 9997) into the `endpoint` i
 ![Network Diagram](diagrams/network-diagram.png)
 ![Network Diagram](screenshots/setup/virtualbox-vms.png)
 
+## Lab Setup
+
+User accounts are bulk-created from a CSV with a PowerShell script —
+see [`scripts/`](scripts/). This populates the domain so the attack
+scenarios have realistic targets.
+
 ## Attack Scenarios
 
 | # | Scenario | MITRE | Status |
