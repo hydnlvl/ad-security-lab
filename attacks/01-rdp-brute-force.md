@@ -1,92 +1,118 @@
-# Scenario 01: RDP Brute Force (Hydra)
+# Scenario 01: RDP Brute Force - Attack, Detection & Evasion
 
-**MITRE ATT&CK:** T1110.001 Brute Force: Password Guessing
-**Attacker:** Kali Linux (192.168.10.250)
-**Target:** target.adlab.local (Windows 11, 192.168.10.100), account `ADLAB\rgrimes` over RDP
-**Tools:** Hydra (crowbar first, see below), rockyou.txt trimmed to 20 lines
+**MITRE ATT&CK:** T1110.001 Brute Force: Password Guessing **Attacker:** Kali 192.168.10.250 → **Target:** target (Windows 11, 192.168.10.100) over RDP **Tools:** Hydra (crowbar first, see Deviations), rockyou.txt
 
-## What I Did
+**What I did:** ran the attack, found it with a manual search, turned that into a standing alert, tuned the alert to be realistic, then beat it to find where it’s blind.
+## The Attack
 
-Guessed the password for one RDP account (`rgrimes`) from Kali. Had to turn on RDP for the target and give `rgrimes` remote access first.
-
-Wordlist: `head -n20 rockyou.txt`, then appended the real lab password so it would actually hit.
+Guessed the password for one RDP account (`rgrimes`) from Kali. Enabled RDP on the target and gave `rgrimes` remote access first. Made sure lockout was off for clean runs. Wordlist: `head -n20 rockyou.txt` with the real lab password appended so it hits.
 
 ```bash
 hydra -l 'rgrimes' -P passwords.txt rdp://192.168.10.100
 ```
 
-![Attack execution](../screenshots/03-attacks/01-rdp-brute-force-execution.png)
+![[01-intial-attack.png]]
+## What Splunk Caught
 
-Tried crowbar first since that's what the tutorial uses. It failed even on a password I already knew worked, leading me to swap to Hydra. (Details in Deviations.)
-
-## Events Generated
-
-| Event ID | What it means |
-|---|---|
-| 4625 | Failed logon, one per bad guess |
-| 4624 | Successful logon |
-
-Bunch of 4625s in a row, then one 4624 with the attacker's hostname (kali) and IP (192.168.10.250) on it.
-
-## Splunk
-
-Searched immediately after running the attack:
+Searched for failed logons right after the run:
 
 ```spl
 index=endpoint host="target" EventCode=4625
 ```
 
-All hits were `rgrimes`, all within a few seconds of each other.
+![[02-splunk-eventcode-4625.png]]
 
-Then checked for the success:
+All hits were `rgrimes`, clustered within a few seconds. I then checked for the success:
 
 ```spl
 index=endpoint host="target" EventCode=4624 Account_Name=rgrimes
 ```
 
-![Splunk results](../screenshots/03-attacks/01-rdp-brute-force-splunk.png)
+![[03-splunk-logon-details.png]]
 
-Results: 15x 4625 at 2:44:47 PM, then one 4624 at 2:44:53 PM (6 sec later). The 4624 had:
+**15x 4625 at 2:44:47 PM, then one 4624 at 2:44:53 PM** (6 sec later). The 4624 tied the success back to the attacker: Workstation `kali`, Source 192.168.10.250
 
-- Account Name: rgrimes
-- Account Domain: ADLAB
-- Workstation Name: kali
-- Source Network Address: 192.168.10.250
-- Auth Package: NTLM V2
+This search only works because I knew when to look. An alert has to be setup to be detected on its own.
 
-![4624 success detail](../screenshots/03-attacks/01-rdp-brute-force-4624.png)
+> Snapshot was rolled back after this run, so detection work below is on `tstark` (same setup, RDP-enabled account) rather than `rgrimes`.
 
-## Detection Idea (not built yet)
+## Detection - Alert v1
 
-The search above only works because I knew when to look for events. For an actual alert:
+Turned the search into a saved, scheduled alert:
 
 ```spl
 index=endpoint host=target EventCode=4625
-| stats count min(_time) max(_time) by Account_Name, Source_Network_Address
+| stats count min(_time) as first_seen max(_time) as last_seen by Account_Name, Source_Network_Address
+| where count >= 5
 ```
 
-Set a threshold on count, bump severity if a matching 4624 follows.
+**Alert settings:** Cron `*/5 * * * *`, 15-min window, trigger on results > 0, severity High.
 
-## Takeaway
+Confirmed it fires on a normal Hydra run:
+![[04-alert-triggered.png]]
 
-15 failed logins in a few seconds from a singular account and IP, then a success 6 sec later. This would not indicate a typo pattern. A real SOC analysist would check what the session did after login, check if 192.168.10.250 should even be hitting RDP on this box.
+5-in-15-min is unrealistic. Real users can fail logins within that window. Retuned alert to **10 failures in 5 min**:
 
-## Remediation
+```spl
+index=endpoint host=target EventCode=4625 earliest=-5m@m latest=now
+| stats count min(_time) as first_seen max(_time) as last_seen by Account_Name, Source_Network_Address
+| where count >= 10
+```
 
-- Account lockout (off here on purpose, see caveats)
-- NLA on RDP
-- MFA
-- Cut down who has RDP access
-- Actually build the threshold alert above
+Confirmed v2 still fires on the fast attack.
 
-## Deviations
+## Evasion - Low and slow
 
-Crowbar said "no results found" on a password I'd already logged in with manually via xfreerdp. Also finished all 20 attempts in under a second, too fast for real handshakes. Hydra 9.7 got it on the first pass. Kept the crowbar output as evidence but the documented attack is the Hydra run.
+Space guesses out so no 5-min window ever holds 10.
+
+```bash
+head -n 15 rockyou.txt > passwords.txt
+hydra -l 'tstark' -P passwords.txt -t 1 -W 40 rdp://192.168.10.100
+```
+
+**Evaded.** Per-window counts never reached 10, so alert never triggered.
+
+```spl
+index=endpoint host=target EventCode=4625 Account_Name=tstark earliest=-20m@m latest=now
+| timechart span=5m count
+```
+
+![[05-evasion-logs.png]]
+
+| 5-min bin | 13:45 | 13:50 | 13:55 | 14:00 |
+| --------- | ----- | ----- | ----- | ----- |
+| failures  | 3     | 3     | 6     | 2     |
+
+**Fix:** detect gaps between failures or use a much longer window, both of which can raise false positives. The threshold is always a tradeoff between catching slow attacks and alerting on normal user error.
+
+## Evasion — Password Spray
+
+Spray one password against many accounts. The alert counts failures *per account*, so one guess each spreads the failures too thin to cross the threshold.
+
+```bash
+hydra -L users.txt -p 'password123' rdp://192.168.10.100
+```
+
+9 accounts hit from one IP, each at 1-2 failures, none near 10:
+
+```spl
+index=endpoint host=target EventCode=4625 Source_Network_Address=192.168.10.250 earliest=-5m@m latest=now
+| stats count by Account_Name
+```
+
+![[06-spray-per-account.png]]
+
+Alert triggered, but only on the blank `-` account: each failure is additionally logged under an account with no name. The blank copies pooled past 10. This is a property of the logging, not spray detection. The rule counts per account, not per source IP.
+
+**Fix:** detect one source hitting many distinct accounts, instead of counting per account.
+
+```spl
+index=endpoint host=target EventCode=4625 earliest=-15m@m latest=now
+| stats dc(Account_Name) as distinct_accounts values(Account_Name) as accounts by Source_Network_Address
+| where distinct_accounts >= 5
+```
 
 ## Troubleshooting
 
-Kali and the Windows VMs aren't NTP synced. Clocks are off by about an hour (Hydra said 15:47, Splunk's matching 4624 says 2:44:53 PM). Doesn't matter, events still line up by IP + order.
-
-## Lab Caveats
-
-Small wordlist, lockout off for a clean run, flat network, single box. Lab passwords only. Didn't reset the target between crowbar troubleshooting and the final run, Splunk results here are scoped to just the clean Hydra run's time window.
+- **Alert didn't fire at first:** saved as cron `0 6 * * 1` (Mondays 6 AM) with a 24h range. Defaults clicked past in the dialog. Schedule and window have to match. Fixed to `*/5` + 5-min.
+- Clock offset (initial attack only): pre-NTP-sync, Kali and Windows clocks differed ~1hr, so the attack screenshots’ timestamps don’t match. Correlated by IP + sequence; detection work is post-sync.
