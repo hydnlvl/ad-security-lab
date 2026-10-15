@@ -1,6 +1,6 @@
 # Scenario 01: RDP Brute Force - Attack, Detection & Evasion
 
-**MITRE ATT&CK:** T1110.001 Brute Force: Password Guessing **Attacker:** Kali 192.168.10.250 → **Target:** target (Windows 11, 192.168.10.100) over RDP **Tools:** Hydra (crowbar first, see Deviations), rockyou.txt
+**MITRE ATT&CK:** T1110.001 Brute Force: Password Guessing **Attacker:** Kali 192.168.10.250 → **Target:** target (Windows 11, 192.168.10.100) over RDP **Tools:** Hydra, rockyou.txt
 
 **What I did:** ran the attack, found it with a manual search, turned that into a standing alert, tuned the alert to be realistic, then beat it to find where it’s blind.
 ## The Attack
