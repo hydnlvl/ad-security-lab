@@ -27,14 +27,6 @@ All VMs on `192.168.10.0/24`, isolated from the host network.
 
 Logs forward to Splunk via Universal Forwarder (port 9997) into the `endpoint` index.
 
-## Lab Setup
-
-The `setup/` docs cover build steps and configuration choices that go beyond the reference tutorial, explaining decisions and deviations specific to this lab.
-
-User accounts are bulk-created from a CSV with a PowerShell script —
-see [`scripts/`](scripts/). This populates the domain so the attack
-scenarios have realistic targets.
-
 ## Attack Scenarios
 
 | #   | Scenario                                                                     | MITRE     | Status      |
