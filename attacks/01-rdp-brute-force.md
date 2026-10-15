@@ -11,7 +11,7 @@ Guessed the password for one RDP account (`rgrimes`) from Kali. Enabled RDP on t
 hydra -l 'rgrimes' -P passwords.txt rdp://192.168.10.100
 ```
 
-![[01-intial-attack.png]]
+![](../screenshots/01-rdp-brute-force/01-initial-attack.png)
 ## What Splunk Caught
 
 Searched for failed logons right after the run:
@@ -20,7 +20,7 @@ Searched for failed logons right after the run:
 index=endpoint host="target" EventCode=4625
 ```
 
-![[02-splunk-eventcode-4625.png]]
+![](../screenshots/01-rdp-brute-force/02-splunk-eventcode-4625.png)
 
 All hits were `rgrimes`, clustered within a few seconds. I then checked for the success:
 
@@ -28,7 +28,7 @@ All hits were `rgrimes`, clustered within a few seconds. I then checked for the 
 index=endpoint host="target" EventCode=4624 Account_Name=rgrimes
 ```
 
-![[03-splunk-logon-details.png]]
+![](../screenshots/01-rdp-brute-force/03-splunk-logon-details.png)
 
 **15x 4625 at 2:44:47 PM, then one 4624 at 2:44:53 PM** (6 sec later). The 4624 tied the success back to the attacker: Workstation `kali`, Source 192.168.10.250
 
@@ -49,7 +49,7 @@ index=endpoint host=target EventCode=4625
 **Alert settings:** Cron `*/5 * * * *`, 15-min window, trigger on results > 0, severity High.
 
 Confirmed it fires on a normal Hydra run:
-![[04-alert-triggered.png]]
+![](../screenshots/01-rdp-brute-force/04-alert-triggered.png)
 
 5-in-15-min is unrealistic. Real users can fail logins within that window. Retuned alert to **10 failures in 5 min**:
 
@@ -77,7 +77,7 @@ index=endpoint host=target EventCode=4625 Account_Name=tstark earliest=-20m@m la
 | timechart span=5m count
 ```
 
-![[05-evasion-logs.png]]
+![](../screenshots/01-rdp-brute-force/05-evasion-logs.png)
 
 | 5-min bin | 13:45 | 13:50 | 13:55 | 14:00 |
 | --------- | ----- | ----- | ----- | ----- |
@@ -100,7 +100,7 @@ index=endpoint host=target EventCode=4625 Source_Network_Address=192.168.10.250 
 | stats count by Account_Name
 ```
 
-![[06-spray-per-account.png]]
+![](../screenshots/01-rdp-brute-force/06-spray-per-account.png)
 
 Alert triggered, but only on the blank `-` account: each failure is additionally logged under an account with no name. The blank copies pooled past 10. This is a property of the logging, not spray detection. The rule counts per account, not per source IP.
 
